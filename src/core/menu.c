@@ -9,11 +9,24 @@
 #define NAME_COL   2
 #define TICK_MS    50u
 
+/* Longest name that fits in the 80-column text mode after NAME_COL. A
+ * longer name would wrap onto the next row and shift the menu. */
+#define NAME_MAX (80u - NAME_COL - 2u)
+
 static void draw_entry(const struct bb_console *con, unsigned top,
                        size_t i, int selected)
 {
+    char name[NAME_MAX + 1];
+    const char *s = bb_entries[i].name;
+    unsigned n = 0;
+
+    while (s[n] != '\0' && n < NAME_MAX) {
+        name[n] = s[n];
+        n++;
+    }
+    name[n] = '\0';
     con->put(MARKER_COL, top + (unsigned)i, selected ? ">" : " ");
-    con->put(NAME_COL, top + (unsigned)i, bb_entries[i].name);
+    con->put(NAME_COL, top + (unsigned)i, name);
 }
 
 /* Writes the decimal form of v into buf; returns the new write position. */

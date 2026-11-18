@@ -78,6 +78,8 @@ typedef struct {
 struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
 typedef EFI_STATUS (EFIAPI *EFI_TEXT_STRING)(
     struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *This, const CHAR16 *String);
+typedef EFI_STATUS (EFIAPI *EFI_TEXT_SET_MODE)(
+    struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *This, UINTN ModeNumber);
 typedef EFI_STATUS (EFIAPI *EFI_TEXT_QUERY_MODE)(
     struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *This, UINTN ModeNumber,
     UINTN *Columns, UINTN *Rows);
@@ -96,7 +98,7 @@ typedef struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
     EFI_TEXT_STRING              OutputString;
     void                        *TestString;
     EFI_TEXT_QUERY_MODE          QueryMode;
-    void                        *SetMode;
+    EFI_TEXT_SET_MODE            SetMode;
     EFI_TEXT_SET_ATTRIBUTE       SetAttribute;
     EFI_TEXT_CLEAR_SCREEN        ClearScreen;
     EFI_TEXT_SET_CURSOR_POSITION SetCursorPosition;
@@ -250,8 +252,17 @@ typedef struct {
     UINTN    FrameBufferSize;
 } EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE;
 
-typedef struct {
-    void *QueryMode, *SetMode, *Blt;
+struct EFI_GRAPHICS_OUTPUT_PROTOCOL;
+typedef EFI_STATUS (EFIAPI *EFI_GOP_QUERY_MODE)(
+    struct EFI_GRAPHICS_OUTPUT_PROTOCOL *This, uint32_t ModeNumber,
+    UINTN *SizeOfInfo, EFI_GRAPHICS_OUTPUT_MODE_INFORMATION **Info);
+typedef EFI_STATUS (EFIAPI *EFI_GOP_SET_MODE)(
+    struct EFI_GRAPHICS_OUTPUT_PROTOCOL *This, uint32_t ModeNumber);
+
+typedef struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
+    EFI_GOP_QUERY_MODE QueryMode;
+    EFI_GOP_SET_MODE   SetMode;
+    void              *Blt;
     EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *Mode;
 } EFI_GRAPHICS_OUTPUT_PROTOCOL;
 

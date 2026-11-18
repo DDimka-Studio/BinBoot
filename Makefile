@@ -51,6 +51,13 @@ CLANG    ?= clang
 LLD_LINK ?= lld-link
 LD_LLD   ?= ld.lld
 
+# Short progress lines by default. make V=1 prints every full command.
+ifeq ($(V),1)
+Q :=
+else
+Q := @
+endif
+
 ifeq ($(filter help clean,$(MAKECMDGOALS)),)
 define need_tool
 $(if $(shell command -v $(1) 2>/dev/null),,$(error '$(1)' not found. If you ran `sudo make ...`: sudo resets PATH, so run make as a normal user - the install step asks for root by itself. Otherwise install clang and lld, or point to the tool: make $(2)=/path/to/$(1)))
@@ -132,24 +139,35 @@ all: $(TARGET)
 # Tiny EFI app used as the embedded demo payload.
 blobs/$(ARCH)/test.efi: tools/testpayload/payload.c
 	@mkdir -p blobs/$(ARCH) $(OUT)
-	$(CC) $(CFLAGS) -c $< -o $(OUT)/payload.o
-	$(LINK) $(LDFLAGS) -out:$@ $(OUT)/payload.o
+	@echo "  CC    $<  (demo payload)"
+	$(Q)$(CC) $(CFLAGS) -c $< -o $(OUT)/payload.o
+	@echo "  LINK  $@"
+	$(Q)$(LINK) $(LDFLAGS) -out:$@ $(OUT)/payload.o
 
 # Rebuild the config object whenever an embedded file changes.
 $(OUT)/$(CONFIG_C:.c=.o): $(BLOBS) $(wildcard blobs/$(ARCH)/*)
 
 $(OUT)/%.o: %.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	@echo "  CC    $<"
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJS)
-	$(LINK) $(LDFLAGS) -out:$@ $(OBJS)
+	@echo "  LINK  $@"
+	$(Q)$(LINK) $(LDFLAGS) -out:$@ $(OBJS)
 
 # ---- user-facing targets ----
 
 # Prints where the result is, so it is easy to find.
 build_uefi: $(TARGET)
-	@echo "Built UEFI image: $(TARGET)"
+	@echo ""
+	@echo "UEFI image ready: $(TARGET)"
+	@echo "  Copy it to the EFI System Partition as: EFI/BOOT/$(EFINAME)"
+	@echo "  (only this one file is needed; the config is already inside it)"
+	@if grep -q '^BB_EMBED(' $(CONFIG_C); then \
+	    echo "  NOTE: $(CONFIG_C) embeds an EFI file (BB_EMBED). The firmware reads the"; \
+	    echo "  whole file ($$(( $$(stat -c %s $(TARGET)) / 1048576 )) MiB) at every start, so the menu waits for it."; \
+	    echo "  A UKI of 60-100 MB makes this slow: put it on the disk and use .uki_path."; fi
 
 # Legacy BIOS (x86 real mode): see mk/bios.mk. BIOS code exists for x86 only.
 # disk=/dev/sdX also installs the result (asks first; yes=1 skips the question).
@@ -180,19 +198,43 @@ ifeq ($(filter x86_64 ia32,$(ARCH)),)
 	$(error The BIOS build is for x86 only (arch is '$(ARCH)'))
 endif
 	$(MAKE) -f mk/bios.mk BUILD=$(BUILD) CONFIG_C=$(CONFIG_C) PART=$(part) \
-	    CLANG=$(CLANG) LD_LLD=$(LD_LLD)
+	    CLANG=$(CLANG) LD_LLD=$(LD_LLD) V=$(V)
 
 help:
 	@echo "BinBoot build targets:"
-	@echo "  make build_uefi arch=native|x86_64|ia32|aarch64 [build=debug|release]"
-	@echo "  make build_bios [build=debug|release] [part=1..4] [disk=/dev/sdX [yes=1]]"
-	@echo "      part=N: partition N is the first (default) menu entry"
-	@echo "      disk=:  also installs onto that whole disk (needs root)"
-	@echo "  make run [arch=...]       boot the UEFI build in QEMU"
-	@echo "  make dist                 source archive for a release"
-	@echo "  make clean"
-	@echo "Settings are in config/config.h and config/config.c (see docs/)."
-	@echo "Note: write arch=native, not -arch=native (make treats - words as options)."
+	@echo ""
+	@echo "  UEFI (one .EFI file, configured at build time):"
+	@echo "    make build_uefi arch=native|x86_64|ia32|aarch64 [build=debug|release]"
+	@echo "        arch=native  the machine you are building on (default x86_64)"
+	@echo "        build=debug  adds logging (default); build=release is smaller"
+	@echo "    Result: build/<arch>/<build>/<file>, where <file> is:"
+	@echo "        x86_64   -> BOOTX64.EFI    (64-bit PCs)"
+	@echo "        ia32     -> BOOTIA32.EFI   (32-bit UEFI)"
+	@echo "        aarch64  -> BOOTAA64.EFI   (ARM64)"
+	@echo "    Install: copy the file to EFI/BOOT/ on the EFI System Partition."
+	@echo ""
+	@echo "  Legacy BIOS (x86 only, MBR disks):"
+	@echo "    make build_bios [build=debug|release] [part=1..4] [disk=/dev/sdX [yes=1]]"
+	@echo "        part=N       partition N becomes the first (default) menu entry"
+	@echo "        disk=/dev/X  also writes the loader to that whole disk (asks first;"
+	@echo "                     yes=1 skips the question). Needs root for the write only."
+	@echo "    Result: build/bios/<build>/mbr.bin and stage2.bin"
+	@echo ""
+	@echo "  Other:"
+	@echo "    make run [arch=...]    boot the UEFI build in QEMU"
+	@echo "    make bios-test         BIOS test suite"
+	@echo "    make linux-test KERNEL=/path/to/vmlinuz   test with a real kernel"
+	@echo "    make dist              source archive for a release"
+	@echo "    make clean"
+	@echo ""
+	@echo "  Options:"
+	@echo "    V=1                    show the full compiler and linker commands"
+	@echo "    CLANG=, LLD_LINK=, LD_LLD=  point to tools that are not on PATH"
+	@echo ""
+	@echo "Settings: config/config.h (texts, timeouts, colors) and config/config.c (menu entries)."
+	@echo "Docs: docs/building.md, docs/configuration.md"
+	@echo "Use arch=native, not -arch=native (make reads a leading - as its own option)."
+	@echo "Do not run make with sudo; only the disk= install asks for root."
 
 # make dist: binboot-<version>.tar.gz of the sources (for a release).
 dist:

@@ -19,6 +19,13 @@ LD_LLD ?= ld.lld
 CC := $(CLANG)
 LD := $(LD_LLD)
 
+# Short progress lines by default; make V=1 shows the full commands.
+ifeq ($(V),1)
+Q :=
+else
+Q := @
+endif
+
 CFLAGS := -target i386-pc-none-elf -m16 -std=c11 -ffreestanding -fno-pic \
           -fno-pie -fno-stack-protector -fno-builtin -fomit-frame-pointer \
           -fno-asynchronous-unwind-tables -fno-unwind-tables \
@@ -48,14 +55,17 @@ all: $(OUT)/mbr.bin $(OUT)/stage2.bin
 
 $(OUT)/%.o: %.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	@echo "  CC    $<"
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUT)/src/fw/bios/%.o: src/fw/bios/%.S
 	@mkdir -p $(dir $@)
-	$(CC) -target i386-pc-none-elf -c $< -o $@
+	@echo "  AS    $<"
+	$(Q)$(CC) -target i386-pc-none-elf -c $< -o $@
 
 $(OUT)/stage2.bin: $(OBJS) src/fw/bios/stage2.ld
-	$(LD) -m elf_i386 -T src/fw/bios/stage2.ld --oformat binary \
+	@echo "  LD    $@"
+	$(Q)$(LD) -m elf_i386 -T src/fw/bios/stage2.ld --oformat binary \
 	      -o $@ $(OBJS)
 	@n=$$(( ($$(stat -c %s $@) + 511) / 512 )); \
 	if [ $$n -gt $(MAX_STAGE2_SECTORS) ]; then \
@@ -65,7 +75,8 @@ $(OUT)/stage2.bin: $(OBJS) src/fw/bios/stage2.ld
 
 # The MBR needs the stage 2 sector count, so it is built after stage 2.
 $(OUT)/mbr.bin: src/fw/bios/mbr.S src/fw/bios/mbr.ld $(OUT)/stage2.bin
-	@n=$$(( $$(stat -c %s $(OUT)/stage2.bin) / 512 )); \
+	@echo "  AS    src/fw/bios/mbr.S"
+	$(Q)n=$$(( $$(stat -c %s $(OUT)/stage2.bin) / 512 )); \
 	$(CC) -target i386-pc-none-elf -DSTAGE2_SECTORS=$$n -c $< \
 	      -o $(OUT)/mbr.o && \
 	$(LD) -m elf_i386 -T src/fw/bios/mbr.ld --oformat binary \

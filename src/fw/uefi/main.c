@@ -29,6 +29,14 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *st)
     BB_LOG_SET_SINK(uefi_log_sink);
     BB_LOG("BinBoot: started");
 
+    /* Keys pressed before BinBoot started (e.g. in the firmware setup) must
+     * not skip the menu or cancel the countdown. Empty the input queue. */
+    {
+        unsigned n;
+        for (n = 0; n < 16; n++)
+            (void)con->poll_key();
+    }
+
 #if BB_BOOT_INFO
     /* The information gets its own screen; the menu replaces it. A key
      * pressed meanwhile skips the wait and cancels the automatic boot. */

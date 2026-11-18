@@ -32,6 +32,28 @@
  * countdown. 0 = boot the default entry at once, without showing a menu. */
 #define BB_TIMEOUT_SECONDS      5
 
+/* UEFI: text screen mode the menu uses.
+ *   -1  automatic (default): BinBoot reads the display's resolution three
+ *       times, and when the readings agree it picks the text mode whose shape
+ *       matches the display. If the readings keep changing, mode 0 is used.
+ *   0.. a fixed firmware text mode. Mode 0 is always 80x25 (the UEFI spec
+ *       requires it), so it is the same on every machine. 1 is usually 80x50.
+ * A mode number that does not exist falls back to mode 0. */
+#define BB_CONSOLE_MODE         -1
+
+/* UEFI: the display resolution in pixels. This changes what the monitor
+ * shows, so check it on your screen.
+ *
+ *   Not defined (default): BinBoot picks the largest resolution the firmware
+ *     offers, up to 1920x1200. If it cannot, the firmware's current one stays.
+ *   Defined: BinBoot uses exactly these values, and does not second-guess
+ *     them. If the firmware does not offer that size, the current one stays
+ *     and the log says so. 0 x 0 is taken literally: nothing matches it.
+ *
+ * To set one, remove the // and write the numbers. */
+/* #define BB_DISPLAY_WIDTH   1024 */
+/* #define BB_DISPLAY_HEIGHT  768  */
+
 /* Legacy BIOS: the first menu entry is generated from `part=N` of the build
  * command (see config.c) and is named PREFIX + N. */
 #define BB_PART_ENTRY_PREFIX    "Partition "
